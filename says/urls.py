@@ -22,5 +22,5 @@ urlpatterns = [
     path('api/v1/products/', include('products.urls')),
     path('api/v1/auth/', include('user.urls')),
     path('api/v1/quiz/', include('quiz.urls')),
-    path('api/v1/acne/', include('ai_acne_analyzer.urls'))
+    # path('api/v1/acne/', include('ai_acne_analyzer.urls'))
 ]

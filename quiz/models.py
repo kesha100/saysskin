@@ -75,3 +75,5 @@ class UserAnswer(models.Model):
 
     def __str__(self):
         return f"Selected '{self.selected_answer.answer_text}' for '{self.question.question_text}' by {self.user_quiz.user.username}"
+
+

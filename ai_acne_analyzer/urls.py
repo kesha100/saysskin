@@ -1,6 +1,7 @@
-from django.urls import path
-from .views import AcneAnalysisView
+# from django.urls import path
+# from .views import ImageUploadView, ImageDetailView
 
-urlpatterns = [
-    path('analyze-acne/', AcneAnalysisView.as_view(), name='analyze-acne'),
-]
+# urlpatterns = [
+#     path('upload-image/', ImageUploadView.as_view(), name='upload-image'),
+#     path('image/<int:pk>/', ImageDetailView.as_view(), name='image-detail'),
+# ]
