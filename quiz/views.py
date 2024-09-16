@@ -93,7 +93,7 @@ class UserQuizViewSet(ModelViewSet):
                 matched_products = self.match_products(gpt_recommendations_json, products_data)
 
                 # Filter out SPF products
-                filtered_products = [product for product in matched_products if "sun cream" not in product['name'].lower()]
+                filtered_products = [product for product in matched_products if "sun cream" or "spf" or "солнцезащитный" not in product['name'].lower()]
 
                 # Separate morning and night routines
                 morning_routine = matched_products  # First 4 products for morning routine
