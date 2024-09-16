@@ -24,8 +24,7 @@ SECRET_KEY = 'django-insecure-mdz=ooo-hqzgy*7rm&$$d)!udt@aq753re5my$4##5sk$mcm@i
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
-
-ALLOWED_HOSTS = ["127.0.0.1", "saysskin.onrender.com'"]
+ALLOWED_HOSTS = ["127.0.0.1", "saysskin.onrender.com"]
 
 
 # Application definition
@@ -60,6 +59,7 @@ MIDDLEWARE = [
 ]
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
+    'https://saysskin-frontend.vercel.app'
 ]
 ROOT_URLCONF = 'says.urls'
 
