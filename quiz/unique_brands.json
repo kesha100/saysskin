@@ -1,108 +1,105 @@
-[
-    "ABIB",
-    "ACWELL",
-    "ALLIES",
-    "ANGIOPHARM",
-    "ANUA",
-    "ARAVIA",
-    "ATOPALM",
-    "AVENE",
-    "AXIS-Y",
-    "A’PIEU",
-    "BABOR",
-    "BANILA",
-    "BEAUTY",
-    "BENTON",
-    "BEPLAIN",
-    "BIODANCE",
-    "BIODERMA",
-    "BLITHE",
-    "BOHICARE",
-    "BY",
-    "CELIMAX",
-    "CERAVE",
-    "CLARINS",
-    "CLINIQUE",
-    "COS",
-    "COSRX",
-    "CU",
-    "CURRENT",
-    "DEOPROCE",
-    "DERMA:B",
-    "DJ",
-    "DR.ALTHEA",
-    "DR.CEURACLE",
-    "DR.JART",
-    "DR.JART+",
-    "Dr.Jart+",
-    "EARTHNIQ",
-    "EIIO",
-    "ELIZABETH",
-    "ETUDE",
-    "GENOSYS",
-    "GLOW",
-    "GOODAL",
-    "HEIMISH",
-    "HOLIFROG",
-    "HUR",
-    "HUXLEY",
-    "HYGGEE",
-    "INKEILIST",
-    "INSIGHT",
-    "INSTYTUTUM",
-    "ISNTREE",
-    "I’M",
-    "JAPAN",
-    "JMSOLUTION",
-    "JUICE",
-    "J’SDERMA",
-    "KAINE",
-    "KIEHL’S",
-    "KLAIRS",
-    "LA",
-    "LAGOM",
-    "LIKATO",
-    "MANYO",
-    "MARIO",
-    "MATSU",
-    "MEDI-PEEL",
-    "MEDIHEAL",
-    "MILK",
-    "MISSHA",
-    "MULTI",
-    "NEEDLY",
-    "NEOGEN",
-    "NUIBE",
-    "NUMBUZ:N",
-    "NUMBUZIN",
-    "PAPA",
-    "PAULA’S",
-    "PIXI",
-    "PRE",
-    "PROFESSOR",
-    "PSA",
-    "PURITO",
-    "PYUNKANG",
-    "Q+A",
-    "REAL",
-    "RHODE",
-    "ROUND",
-    "ROVECTIN",
-    "SIORIS",
-    "SISUA",
-    "SKIN",
-    "SKIN&LAB",
-    "SKIN1004",
-    "ST",
-    "SULWHASOO",
-    "SUNKILLER",
-    "SUR.MEDIC",
-    "THE",
-    "TIAM",
-    "TIMELESS",
-    "TOCOBO",
-    "TORRIDEN",
-    "VIVIENNE",
-    "YOUTH",
-    "АЛЬГИНАТНАЯ"
-]
+{
+    "korean_brands": [
+      {
+        "name": "Innisfree",
+        "description": "Known for using natural ingredients from Korea's Jeju Island, offering eco-friendly skincare products.",
+        "website": "https://www.innisfree.com"
+      },
+      {
+        "name": "Laneige",
+        "description": "Famous for its Water Sleeping Mask, Laneige focuses on moisture-based skincare.",
+        "website": "https://www.laneige.com"
+      },
+      {
+        "name": "Sulwhasoo",
+        "description": "Luxury skincare brand that incorporates traditional Korean herbal ingredients like ginseng.",
+        "website": "https://www.sulwhasoo.com"
+      },
+      {
+        "name": "Missha",
+        "description": "Affordable and effective skincare products, known for its BB creams and Time Revolution line.",
+        "website": "https://www.misshaus.com"
+      },
+      {
+        "name": "Etude House",
+        "description": "Youthful and vibrant skincare and makeup, focusing on fun and affordable products.",
+        "website": "https://www.etudehouse.com"
+      },
+      {
+        "name": "The Face Shop",
+        "description": "A wide range of natural skincare and cosmetics, using plant-based ingredients.",
+        "website": "https://www.thefaceshop.com"
+      },
+      {
+        "name": "Cosrx",
+        "description": "Minimalist skincare brand focusing on acne treatment and sensitive skin with simple, effective formulas.",
+        "website": "https://www.cosrx.com"
+      },
+      {
+        "name": "Dr. Jart+",
+        "description": "Dermatologist-developed skincare brand that combines science and art, known for its Cicapair and Ceramidin lines.",
+        "website": "https://www.drjart.com"
+      },
+      {
+        "name": "Banila Co",
+        "description": "Famous for its Clean It Zero cleansing balm, focusing on effortless skincare solutions.",
+        "website": "https://www.banilaco.com"
+      },
+      {
+        "name": "Tony Moly",
+        "description": "Fun and creative skincare products with quirky packaging, appealing to younger audiences.",
+        "website": "https://www.tonymoly.com"
+      },
+      {
+        "name": "IOPE",
+        "description": "Combines advanced technology with skincare, known for its Bio Essence and plant-based extracts.",
+        "website": "https://www.iope.com"
+      },
+      {
+        "name": "Hera",
+        "description": "Luxury skincare brand known for its high-performance anti-aging products and sunscreens.",
+        "website": "https://www.hera.com"
+      },
+      {
+        "name": "Skinfood",
+        "description": "Focuses on food-based skincare ingredients such as honey, rice, and black sugar.",
+        "website": "https://www.theskinfood.com"
+      },
+      {
+        "name": "Belif",
+        "description": "Herbal skincare brand known for its hydration-focused products like The True Cream Aqua Bomb.",
+        "website": "https://www.belif.com"
+      },
+      {
+        "name": "Klairs",
+        "description": "Focused on simple, gentle, and cruelty-free skincare for sensitive skin.",
+        "website": "https://www.klairscosmetics.com"
+      },
+      {
+        "name": "Mamonde",
+        "description": "Inspired by flowers and botanical ingredients, offering natural and feminine skincare solutions.",
+        "website": "https://www.mamonde.com"
+      },
+      {
+        "name": "Nature Republic",
+        "description": "Offers a variety of skincare products with a focus on natural ingredients like aloe vera and green tea.",
+        "website": "https://www.naturerepublic.com"
+      },
+      {
+        "name": "Holika Holika",
+        "description": "Fun, bold skincare and makeup products with playful packaging, known for its aloe vera soothing gel.",
+        "website": "https://www.holikaholika.co.kr"
+      },
+      {
+        "name": "Amorepacific",
+        "description": "High-end luxury brand that focuses on using green tea and other Asian botanicals in its skincare formulations.",
+        "website": "https://www.amorepacific.com"
+      },
+      {
+        "name": "A'PIEU",
+        "description": "Sister brand of Missha, providing affordable yet effective skincare and makeup for younger consumers.",
+        "website": "https://www.apieu.com"
+      }
+    ]
+  }
+  

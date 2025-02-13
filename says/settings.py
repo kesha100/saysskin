@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-mdz=ooo-hqzgy*7rm&$$d)!udt@aq753re5my$4##5sk$mcm@i'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = ["127.0.0.1", "saysskin.onrender.com"]
 
 
@@ -44,9 +44,11 @@ INSTALLED_APPS = [
     'user',
     'ai_acne_analyzer',
     'django.contrib.auth',
+    'django_filters'
 ]
 
 MIDDLEWARE = [
+    'django.middleware.gzip.GZipMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -92,14 +94,23 @@ WSGI_APPLICATION = 'says.wsgi.application'
 #         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'says',  # Extracted from the URL after the last slash
-        'USER': 'girls',  # Extracted from the URL before the password
-        'PASSWORD': 'NpxLSk87X5dpvgwU6p3Bjl4mGwikFDcl',  # Password from the URL
-        'HOST': 'dpg-crgn47jqf0us73do3l6g-a.oregon-postgres.render.com',  # Hostname from the URL
-        'PORT': '5432',  # Default PostgreSQL port
+        'NAME': os.getenv('DATABASE_NAME'),
+        'USER': os.getenv('DATABASE_USER'),
+        'PASSWORD': os.getenv('DATABASE_PASSWORD'),
+        'HOST': os.getenv('DATABASE_HOST'),
+        'PORT': os.getenv('DATABASE_PORT'),
+        'OPTIONS': {
+            'options': '-c search_path=public'
+        }
     }
 }
 
@@ -153,7 +164,14 @@ REST_FRAMEWORK = {
     # 'DEFAULT_PERMISSION_CLASSES': (
     #     'rest_framework.permissions.IsAuthenticated',
     # ),
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    # 'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    # 'PAGE_SIZE': 1,
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '10/minute',  # Adjust based on your needs
+    },
 }
+
 
 
 # JWT Token Setup

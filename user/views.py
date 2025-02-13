@@ -22,20 +22,46 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
+from .serializers import LoginSerializer, UserSerializer
+from django.shortcuts import get_object_or_404
+from django.conf import settings
+from .models import CustomUser 
+from quiz.models import QuizSession
 class LoginView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
             refresh = RefreshToken.for_user(user)
             user_serializer = UserSerializer(user)
+
+            # Check if the user had any anonymous quizzes associated with the session ID
+            session_id = request.session.session_key
+            if not session_id:
+                request.session.create()  # Create a new session if none exists
+                session_id = request.session.session_key
+
+            # Find any anonymous quizzes associated with the session ID
+            anonymous_quizzes = QuizSession.objects.filter(session_id=session_id, user__isnull=True)
+
+            # If there are quizzes linked to the anonymous session, assign them to the authenticated user
+            if anonymous_quizzes.exists():
+                anonymous_quizzes.update(user=user)  # Clear the session ID after linking to the user
+
             return Response({
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
-                'user': user_serializer.data
+                'user': user_serializer.data,
+                'message': f'{anonymous_quizzes.count()} quizzes have been successfully merged to your account'
             }, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Profile View
 class ProfileView(APIView):

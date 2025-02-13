@@ -3,42 +3,40 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-import os, re
-import openai
+from django.core.cache import cache
 from openai import OpenAI
-from products.models import Tag, SkinType, Concern
-from products.serializers import ProductSerializer
-from .models import Quiz, UserQuiz, Question, Answer, UserAnswer
-from user.models import UserProfile
-from .serializers import QuizSerializer, UserQuizSerializer, UserAnswerSerializer, QuestionSerializer
-from django.db.models import Count
-from .permissions import IsAdminUserOrReadOnly
+from .models import Quiz, QuizSession
+from .serializers import QuizSerializer, QuizSessionSerializer
+import os, json
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.exceptions import ValidationError
+from django.db import transaction
+from rest_framework.pagination import PageNumberPagination
+from rest_framework import generics 
 from dotenv import load_dotenv
-import logging
-# from .sephora_scraper import fetch_products_from_makeup_api
-# Set up logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-handler = logging.StreamHandler()
-handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-from .unique_brands import brands
 load_dotenv()
+
+
 api_key = os.getenv('OPENAI_API_KEY')
 client = OpenAI(api_key=api_key)
-import json
 
-class QuizViewSet(ModelViewSet):
-    queryset = Quiz.objects.all()
+class QuizListCreateAPIView(generics.ListCreateAPIView):
+    queryset = Quiz.objects.prefetch_related('questions__answers').all()
     serializer_class = QuizSerializer
-    permission_classes = [IsAdminUserOrReadOnly]
+    pagination_class = PageNumberPagination
+
+    def get_serializer_context(self):
+        # Pass the request context to the serializer for pagination
+        return {'request': self.request}
 
 
-class UserQuizViewSet(ModelViewSet):
-    queryset = UserQuiz.objects.all()
-    serializer_class = UserQuizSerializer
+class QuizSessionViewSet(ModelViewSet):
+    queryset = QuizSession.objects.only('user', 'quiz', 'completed').all()
+    serializer_class = QuizSessionSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['user', 'quiz', 'completed']
+    # pagination_class = PageNumberPagination
+
 
     @action(detail=True, methods=['post'])
     def start_quiz(self, request, pk=None):
@@ -46,184 +44,86 @@ class UserQuizViewSet(ModelViewSet):
 
         # Handle quiz start for both anonymous and authenticated users
         if request.user.is_authenticated:
-            user_quiz, created = UserQuiz.objects.get_or_create(
+            user_quiz, created = QuizSession.objects.get_or_create(
                 user=request.user, quiz=quiz, defaults={'completed': False}
             )
         else:
             # For anonymous users, create a quiz with a unique session identifier
             session_id = self.get_anonymous_session_id(request)
-            user_quiz, created = UserQuiz.objects.get_or_create(
+            user_quiz, created = QuizSession.objects.get_or_create(
                 session_id=session_id, quiz=quiz, defaults={'completed': False}
             )
 
         return Response(self.get_serializer(user_quiz).data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-    def get_anonymous_session_id(self, request):
-        # Get or generate a session ID for anonymous users
-        if not request.session.session_key:
-            request.session.create()  # Generate session ID if it doesn't exist
-        return request.session.session_key
-    
-    
 
-    @action(detail=True, methods=['get'])
-    def recommend_products(self, request, pk=None):
-        user_quiz = self.get_object()
-
-        # Ensure the quiz is completed before proceeding
-        if not user_quiz.completed:
-            return Response({'error': 'Quiz must be completed to get recommendations'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Fetch recommendations from ChatGPT
-        gpt_recommendations = self.get_recommendation_from_chatgpt(user_quiz)
-
-        if gpt_recommendations:
-            # Load product data
-            current_directory = os.path.dirname(__file__)
-            json_file_path = os.path.join(current_directory, 'aruuke.json')
-            with open(json_file_path, 'r', encoding='utf-8') as json_file:
-                products_data = json.load(json_file)
-
-            # Parse GPT recommendations string into JSON
-            try:
-                gpt_recommendations_json = json.loads(gpt_recommendations)  # Convert string to JSON
-                logger.debug(f"GPT Recommendations JSON: {gpt_recommendations_json}")
-
-                # Match products
-                matched_products = self.match_products(gpt_recommendations_json, products_data)
-
-                # Filter out SPF products
-                filtered_products = [product for product in matched_products if "sun cream" or "spf" or "солнцезащитный" not in product['name'].lower()]
-
-                # Separate morning and night routines
-                morning_routine = matched_products  # First 4 products for morning routine
-
-                # Assuming makeup remover is a predefined product
-                makeup_remover = {
-                    "name": "BIODERMA SENSIBIO H2O МИЦЕЛЛЯРНАЯ ВОДА",
-                    "price": "720.00 сом",
-                    "link": "https://distore.one/product/bioderma-sensibio-h2o/",
-                    "image": "https://distore.one/wp-content/uploads/2023/10/5f74b38b52d411edbab0000c291e907c_81607722663d11edbab4000c291e907c.jpg",
-                }
-
-                # Night routine starts with makeup remover followed by the remaining morning products
-                night_routine = [makeup_remover] + filtered_products
-
-                return Response({
-                    'morning_routine': morning_routine,
-                    'night_routine': night_routine,
-                    
-                }, status=status.HTTP_200_OK)
-
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse GPT recommendations as JSON: {e}")
-                return Response({'error': 'Failed to parse recommendations'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        else:
-            return Response({'error': 'Failed to get recommendations'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    
-    def get_recommendation_from_chatgpt(self, user_quiz):
-        current_directory = os.path.dirname(__file__)
-        json_file_path = os.path.join(current_directory, 'product_titles.json') 
-        with open(json_file_path) as json_file:
-            products_data = json.load(json_file)
-
-        # Convert the product list into a readable format
-        product_names = [product for product in products_data]  # Adjust based on the structure of your JSON
-        brands_list = ", ".join(product_names)
-        user_answers = UserAnswer.objects.filter(user_quiz=user_quiz)
-    
-        # Collect question and selected answer data
-        answer_data = []
-        for answer in user_answers:
-            question_text = answer.question.question_text  # Assuming Question model has a 'text' field
-            selected_answer_text = answer.selected_answer.answer_text # Assuming Answer model has a 'text' field
-            answer_data.append(f"Question: {question_text}, Answer: {selected_answer_text}")
+    @action(detail=True, methods=['post'], url_path='start-and-fetch-quiz')
+    def start_and_fetch_quiz(self, request, pk=None):
+        # Step 1: Retrieve the quiz by its ID (pk)
+        quiz = get_object_or_404(Quiz, pk=pk)
         
-        # Join all answers into a single string for the prompt
-        formatted_answers = "\n".join(answer_data)
-
-        system_prompt = "You are an AI that recommends beauty products based on user preferences/answers for the quiz."
-        "The user has provided their preferences. Based on these, recommend  products for they're daily use,"
-        "including descriptions, why they suit the user's needs, and the type of product it is."
-    
-        prompt = f"""
-        User's answers {formatted_answers} depending on them please provide the best skincare 4products:
-        1. cleanser
-        2. toner
-        3. cream
-        4. spf
-        Choose products only from the following list of brands randomly, not only first:
-        {brands_list}
-        In JSON Format
+        # Step 2: Start or get the quiz session
+        session_id = self.get_anonymous_session_id(request)
         
-        {{
-            "recommended_products": [
-                {{
-                "name": "Product Name",
-                "description": "Product Description"
-                }}
-            ]
-            }}
-        """
-
         try:
-            # Make API call to ChatGPT
-            response = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        response_format= { "type": "json_object" },
-                        temperature= 0.5,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": prompt}
-                        ],
-
-            
+            with transaction.atomic():
+                if request.user.is_authenticated:
+                    # For authenticated users, get or create a quiz session
+                    quiz_session, created = QuizSession.objects.get_or_create(
+                        user=request.user, quiz=quiz, defaults={'completed': False, 'answers_data': {}}
                     )
-            logger.debug("OpenAI API call successful")
-            
-            # Parse response from ChatGPT
-            recommendation_text = response.choices[0].message.content.strip()
-            return recommendation_text
+                else:
+                    # For anonymous users, track via session_id
+                    quiz_session, created = QuizSession.objects.get_or_create(
+                        session_id=session_id, quiz=quiz, defaults={'completed': False, 'answers_data': {}}
+                    )
+                
+                # Ensure the quiz_session is saved
+                quiz_session.save()
         
         except Exception as e:
-            logger.error(f"Error from OpenAI API: {e}")
+            raise ValidationError(f"Error creating or retrieving quiz session: {str(e)}")
+        
+        # Step 3: Serialize the quiz and quiz session
+        quiz_data = QuizSerializer(quiz).data
+        session_data = QuizSessionSerializer(quiz_session).data
+        
+        # Step 4: Return both quiz and session data
+        response_data = {
+            'quiz': quiz_data,
+            'quiz_session': session_data
+        }
+        
+        # Add debug information
+        response_data['debug'] = {
+            'quiz_session_id': quiz_session.id,
+            'is_authenticated': request.user.is_authenticated,
+            'session_id': session_id if not request.user.is_authenticated else None
+        }
+        
+        return Response(response_data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-    def normalize_string(self, s):
-        return re.sub(r'\s+', ' ', s.strip()).lower()
+    @action(detail=True, methods=['post'])
+    def submit_answers(self, request, pk=None):
+        quiz_session = self.get_object()
 
-    def match_products(self, gpt_recommendations, products_data):
-        try:
-            # Get the recommended products from the GPT response
-            recommended_products = gpt_recommendations.get("recommended_products") or gpt_recommendations.get("products")
-            recommended_names = [self.normalize_string(product['name']) for product in recommended_products]
-            
-            matched_products = []
-            for product in products_data:
-                normalized_title = self.normalize_string(product["title"])
-                # Check for exact or partial matches
-                if any(recommended_name in normalized_title for recommended_name in recommended_names):
-                    matched_products.append({
-                        "name": product['title'],
-                        "price": product['price'],
-                        "link": product['link'],
-                        "image": product['images'][0] if 'images' in product and product['images'] else None,
-                    })
+        if quiz_session.completed:
+            return Response({'error': 'Quiz already completed'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Debug: Print the list of matched products (if any)
-            if matched_products:
-                print(f"Matched products: {matched_products}")
-            else:
-                print("No matching products found.")
+        # Merge incoming answers into the stored answers_data
+        incoming_answers = request.data.get('answers_data', {})
+        quiz_session.answers_data.update(incoming_answers)
+        quiz_session.save()
 
-            return matched_products
+        return Response(self.get_serializer(quiz_session).data, status=status.HTTP_200_OK)
 
-        except KeyError as e:
-            print(f"Key error: {e}")
-            return []
     @action(detail=True, methods=['post'])
     def complete_quiz(self, request, pk=None):
         user_quiz = self.get_object()
+
+        # Check if the quiz is already completed
+        if user_quiz.completed:
+            return Response({'error': 'Quiz has already been completed.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Update the quiz as completed
         user_quiz.completed = True
@@ -231,71 +131,146 @@ class UserQuizViewSet(ModelViewSet):
 
         # Optionally handle anonymous users (no user profile creation)
         if not request.user.is_authenticated:
+            # Handle quiz completion for anonymous users
             return Response({'status': 'Quiz completed for anonymous user.'})
 
-        # For authenticated users, update their profile
+        # For authenticated users, update their profile based on quiz results
         self.create_update_user_profile(user_quiz)
+
         return Response({'status': 'Quiz completed and user profile updated.'})
 
+    @action(detail=True, methods=['get'])
+    def recommend_products(self,quiz_session_id):
+        quiz_session = QuizSession.objects.get(id=quiz_session_id)
 
-    def create_update_user_profile(self, user_quiz):
-        # Initialize or get existing profile
-        profile, _ = UserProfile.objects.get_or_create(user=user_quiz.user)
+        if not quiz_session.completed:
+            return Response({'error': 'Quiz must be completed to get recommendations'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Example: Categorize answers into skin types, concerns, etc.
-        # Collect tags from answers
-        answer_tags = Tag.objects.filter(answers__questions__userquiz=user_quiz).annotate(count=Count('id'))
+        # Cache key for recommendations
+        cache_key = f'recommendations_{quiz_session.id}'
+        recommendations = cache.get(cache_key)
 
-        # Logic to decide on skin types, concerns based on tags
-        # This part of the implementation depends heavily on how tags are structured and how they map to skin types and concerns
-        # Let's assume tags directly relate to skin types and concerns
+        if not recommendations:
+            gpt_recommendations = self.get_recommendation_from_chatgpt(quiz_session)
+            if gpt_recommendations:
+                recommendations = self.process_recommendations(gpt_recommendations)
+                cache.set(cache_key, recommendations, timeout=3600)  # Cache for 1 hour
+            else:
+                return Response({'error': 'Failed to get recommendations'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        skin_types = SkinType.objects.filter(tag__in=answer_tags)
-        concerns = Concern.objects.filter(tag__in=answer_tags)
-
-        # Update profile
-        profile.skin_types.set(skin_types)
-        profile.concerns.set(concerns)
-        profile.save()
-
-
-
-class UserAnswerViewSet(ModelViewSet):
-    queryset = UserAnswer.objects.all()
-    serializer_class = UserAnswerSerializer
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        user_quiz = self.get_user_quiz(request, data['quiz_id'])
-        question = get_object_or_404(Question, id=data['question_id'])
-        answer = get_object_or_404(Answer, id=data['answer_id'])
-
-        user_answer, created = UserAnswer.objects.update_or_create(
-            user_quiz=user_quiz, question=question,
-            defaults={'selected_answer': answer}
-        )
-
-        return Response(self.get_serializer(user_answer).data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+        return Response(recommendations, status=status.HTTP_200_OK)
 
     def get_anonymous_session_id(self, request):
-        # Get or generate a session ID for anonymous users
         if not request.session.session_key:
-            request.session.create()  # Generate session ID if it doesn't exist
+            request.session.create()
         return request.session.session_key
+    def get_recommendation_from_chatgpt(self, quiz_session):
+        # Load product data
+        current_directory = os.path.dirname(__file__)
+        json_file_path = os.path.join(current_directory, 'unique_brands.json')
+
+        with open(json_file_path) as json_file:
+            products_data = json.load(json_file)
+
+        # Check if the structure is correct
+        if 'korean_brands' not in products_data:
+            raise ValueError("Expected 'korean_brands' key in products_data.")
+
+        # Extract the list of brands
+        korean_brands = products_data['korean_brands']
+        
+        # Ensure it's a list
+        if not isinstance(korean_brands, list):
+            raise ValueError("Expected 'korean_brands' to be a list.")
+
+        # Get product names
+        product_names = [brand['name'] for brand in korean_brands]
+        brands_list = ", ".join(product_names)
+
+        quiz = quiz_session.quiz  
+
+        # Use .all() to get the related questions
+        questions = quiz.questions.all()  # Correctly retrieve all questions
+
+        # Create a mapping of question ID to question text
+        question_map = {question.id: question.question_text for question in questions}
     
-    def get_user_quiz(self, request, quiz_id):
-        quiz = get_object_or_404(Quiz, id=quiz_id)
+        # Create a mapping of answer ID to answer text for each question
+        answer_map = {
+            question.id: {answer.id: answer.answer_text for answer in question.answers.all()}  # Use .all() for answers too
+            for question in questions
+        }
 
-        # Check if the user is authenticated
-        if request.user.is_authenticated:
-            user_quiz, created = UserQuiz.objects.get_or_create(
-                user=request.user, quiz=quiz, defaults={'completed': False}
-            )
-        else:
-            # Handle for anonymous users
-            session_id = self.get_anonymous_session_id(request)
-            user_quiz, created = UserQuiz.objects.get_or_create(
-                session_id=session_id, quiz=quiz, defaults={'completed': False}
-            )
+        # Prepare the formatted answers, ensuring to use the correct key type
+        formatted_answers = []
+        for q_id, a_id in quiz_session.answers_data.items():
+            # Convert keys to integer if necessary
+            q_id_int = int(q_id)
+            a_id_int = int(a_id)
 
-        return user_quiz
+            question_text = question_map.get(q_id_int)
+            answer_text = answer_map.get(q_id_int, {}).get(a_id_int)
+
+            if question_text and answer_text:
+                formatted_answers.append(f"{question_text}: {answer_text}")
+
+        formatted_answers_string = "\n".join(formatted_answers)
+        
+        print("Formatted Answers:")
+        print(formatted_answers)
+        print(formatted_answers_string)
+
+        system_prompt = "You are an AI that recommends beauty products based on user quiz answers ."
+        prompt = f"""
+        User's answers: {formatted_answers_string}. Based on this, please recommend products:
+        1. Cleanser
+        2. Toner
+        3. Moisturizer
+        4. SPF
+        5. Micellar 
+        Use the following brands: {brands_list}. Return in JSON format.
+        'recommended_products': 
+            'cleanser': 
+                "brand": "Cosrx",
+                'product': 'Low pH Good Morning Gel Cleanser'
+                'description': 'sepcify why this product depending on what user answer'
+            'toner': 
+                "brand": "Cosrx",
+                'product': 'toner name'
+                'description': 'sepcify why this product depending on what user answer'
+            so on for other products
+        """
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                response_format={"type": "json_object"},
+                temperature=0.5,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            return None
+
+    def process_recommendations(self, gpt_recommendations):
+        try:
+            gpt_recommendations_json = json.loads(gpt_recommendations)
+            # Load additional product data and match products
+            return gpt_recommendations_json  # Process as needed
+        except json.JSONDecodeError:
+            return None
+
+    def merge_anonymous_to_authenticated(self, request):
+        session_id = self.get_anonymous_session_id(request)
+        if session_id and request.user.is_authenticated:
+            # Find the anonymous session
+            try:
+                quiz_session = QuizSession.objects.get(session_id=session_id, user__isnull=True)
+                quiz_session.user = request.user
+                quiz_session.save()
+                return quiz_session
+            except QuizSession.DoesNotExist:
+                return None
